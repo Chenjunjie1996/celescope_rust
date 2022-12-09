@@ -17,16 +17,16 @@ use std::process::Command;
 const BARCODE_FILE_NAME: &str = "barcode.tsv";
 const FILTERED_MATRIX_DIR_SUFFIX: (&str, &str) = ("filtered_feature_bc_matrix", "matrix_10X");
 
-struct Samtools{
-    in_bam: String,
-    out_bam: String,
+struct Samtools<'a>{
+    in_bam: &'a str,
+    out_bam: &'a str,
     threads: i8,
-    temp_sam_file: String,
+    temp_sam_file: &'a str,
     debug: bool,
 }
 
-impl Samtools {
-    fn new(in_bam: String, out_bam:String, threads:i8, temp_sam_file:String, debug: bool) -> Self {
+impl<'a> Samtools<'a> {
+    fn new(in_bam: &'a str, out_bam:&'a str, threads:i8, temp_sam_file:&'a str, debug: bool) -> Self {
         Self {
             in_bam,
             out_bam,
@@ -37,7 +37,7 @@ impl Samtools {
     }
 
     fn samtools_sort(&self) {
-        Command::new(cmd);
+        // Command::new(cmd);
 
         let cmd = format!(
             "samtools sort {} -o {} --threads {}", self.in_bam, self.out_bam, self.threads
@@ -61,13 +61,13 @@ impl Samtools {
 
 }
 
-fn generic_open(file_name: String) -> Result<File, Box<dyn Error>> {
-    let mut file_obj = File::open(&file_name)?;
+fn generic_open(file_name: &str) -> Result<File, Box<dyn Error>> {
+    let mut file_obj = File::open(file_name)?;
     Ok(file_obj)
 }
 
-fn read_one_col(file: String) -> (Vec<String>, usize) {
-    let mut df = std::fs::File::open(&file).unwrap();
+fn read_one_col(file: &str) -> (Vec<String>, usize) {
+    let mut df = std::fs::File::open(file).unwrap();
     let mut contents = String::new();
     df.read_to_string(&mut contents).unwrap();
 
@@ -79,7 +79,7 @@ fn read_one_col(file: String) -> (Vec<String>, usize) {
     (bc_vec.clone(), bc_vec.len())
 }
 
-fn read_one_col_fl(file: String) -> Vec<String>{
+fn read_one_col_fl(file: &str) -> Vec<String>{
     let mut df = std::fs::File::open(&file).unwrap();
     let mut contents = String::new();
     df.read_to_string(&mut contents).unwrap();
@@ -101,7 +101,7 @@ fn read_one_col_fl(file: String) -> Vec<String>{
     bc_vec
 }
 
-fn read_fasta(fasta_file: String) -> std::collections::HashMap<String, String> {
+fn read_fasta(fasta_file: &str) -> std::collections::HashMap<String, String> {
     let mut hm = HashMap::new();
 
     let mut reader = fasta::Reader::from_file(&fasta_file).unwrap();
@@ -119,7 +119,7 @@ fn read_fasta(fasta_file: String) -> std::collections::HashMap<String, String> {
     hm
 }
 
-fn haming_distance(str1: String, str2: String) -> usize{
+fn haming_distance(str1: &str, str2: &str) -> usize{
     let mut distance = 0;
     let (length, length2) = (str1.len(), str2.len());
     if length != length2 {
@@ -133,7 +133,7 @@ fn haming_distance(str1: String, str2: String) -> usize{
     distance
 }
 
-fn haming_correct(str1: String, str2: String) -> bool{
+fn haming_correct(str1: &str, str2: &str) -> bool{
     let threshold = str1.len() / 10 + 1;
     if haming_distance(str1, str2) < threshold{
         return true;
@@ -145,7 +145,7 @@ fn format_number(number: usize) -> String {
     number.to_string()
 }
 
-fn get_matrix_file_path(matrix_dir:String, file_name:String) -> String {
+fn get_matrix_file_path(matrix_dir:&str, file_name:&str) -> String {
     let file_path_vec = vec![
         format!("{}/{}", &matrix_dir, &file_name),
         format!("{}/{}.gz", &matrix_dir, &file_name),
@@ -167,16 +167,16 @@ fn check_file(bible_path: &str) -> i32 {
     result
 }
 
-fn get_barcode_from_matrix_dir(matrix_dir: String) -> (Vec<std::string::String>, usize) {
-    let match_barcode_file = get_matrix_file_path(matrix_dir, (&BARCODE_FILE_NAME).to_string());
-    let (match_barcode, n_match_barcode) = read_one_col(match_barcode_file);
+fn get_barcode_from_matrix_dir(matrix_dir: &str) -> (Vec<String>, usize) {
+    let match_barcode_file = get_matrix_file_path(matrix_dir, BARCODE_FILE_NAME);
+    let (match_barcode, n_match_barcode) = read_one_col(&match_barcode_file);
     (match_barcode, n_match_barcode)
 }
 
-fn get_matrix_dir_from_match_dir(match_dir: String) -> Vec<String> {
+fn get_matrix_dir_from_match_dir(match_dir: &str) -> Vec<String> {
     let mut matrix_dir_pattern_list = Vec::new();
-    matrix_dir_pattern_list.push(format!("{}/05.count/{}", &match_dir, FILTERED_MATRIX_DIR_SUFFIX.0));
-    matrix_dir_pattern_list.push(format!("{}/05.count/{}", &match_dir, FILTERED_MATRIX_DIR_SUFFIX.1));
+    matrix_dir_pattern_list.push(format!("{}/05.count/{}", match_dir, FILTERED_MATRIX_DIR_SUFFIX.0));
+    matrix_dir_pattern_list.push(format!("{}/05.count/{}", match_dir, FILTERED_MATRIX_DIR_SUFFIX.1));
     matrix_dir_pattern_list
 }
 
@@ -210,8 +210,8 @@ fn fastq_line(name:&str, seq:&str, qual:&str) -> String {
     format!("@{}\n{}\n+\n{}\n", name, seq, qual)
 }
 
-fn get_assay_text(assay: &String) -> String{
-    "Single-cell".to_string() + assay
+fn get_assay_text(assay: &str) -> String{
+    format!("Single-cell {}", assay)
 }
 
 fn add_tag(in_bam: &str){
@@ -286,8 +286,5 @@ fn main() {
     let tag2 = &values["TAG_2"];
     println!("{:?}", tag1);
     println!("{:?}", tag2);
-
-
-
 
 }
